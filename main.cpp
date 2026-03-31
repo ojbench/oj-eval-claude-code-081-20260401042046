@@ -2,84 +2,69 @@
 #include <vector>
 #include <queue>
 #include <cstring>
+#include <algorithm>
 using namespace std;
 
 const int MAXN = 3005;
-const int INF = 1e9;
+const int MAXM = 10000;
 
-struct Edge {
-    int to, cap, flow;
-};
-
-vector<Edge> edges;
-vector<int> g[MAXN];
-int level[MAXN];
-int iter[MAXN];
 int n, m;
+int head[MAXN], nxt[MAXM], to[MAXM], cap[MAXM], ecnt;
+int level[MAXN], cur[MAXN];
 
-inline void addEdge(int from, int to, int cap) {
-    g[from].push_back(edges.size());
-    edges.push_back({to, cap, 0});
-    g[to].push_back(edges.size());
-    edges.push_back({from, cap, 0});
+inline void addEdge(int u, int v, int c) {
+    to[ecnt] = v; cap[ecnt] = c; nxt[ecnt] = head[u]; head[u] = ecnt++;
+    to[ecnt] = u; cap[ecnt] = c; nxt[ecnt] = head[v]; head[v] = ecnt++;
 }
 
 bool bfs(int s, int t) {
-    memset(level, -1, (n + 1) * sizeof(int));
+    memset(level, -1, sizeof(level));
     queue<int> q;
     level[s] = 0;
     q.push(s);
 
     while (!q.empty()) {
-        int v = q.front();
+        int u = q.front();
         q.pop();
-        for (int idx : g[v]) {
-            Edge& e = edges[idx];
-            if (level[e.to] < 0 && e.cap > e.flow) {
-                level[e.to] = level[v] + 1;
-                q.push(e.to);
+        for (int i = head[u]; ~i; i = nxt[i]) {
+            if (level[to[i]] < 0 && cap[i]) {
+                level[to[i]] = level[u] + 1;
+                q.push(to[i]);
             }
         }
     }
-
     return level[t] >= 0;
 }
 
-int dfs(int v, int t, int f) {
-    if (v == t) return f;
-
-    for (int& i = iter[v]; i < (int)g[v].size(); i++) {
-        int idx = g[v][i];
-        Edge& e = edges[idx];
-        if (level[v] < level[e.to] && e.cap > e.flow) {
-            int d = dfs(e.to, t, min(f, e.cap - e.flow));
-            if (d > 0) {
-                e.flow += d;
-                edges[idx ^ 1].flow -= d;
+int dfs(int u, int t, int f) {
+    if (u == t) return f;
+    for (int& i = cur[u]; ~i; i = nxt[i]) {
+        if (level[to[i]] == level[u] + 1 && cap[i]) {
+            int d = dfs(to[i], t, min(f, cap[i]));
+            if (d) {
+                cap[i] -= d;
+                cap[i ^ 1] += d;
                 return d;
             }
         }
     }
-
     return 0;
 }
 
 int maxFlow(int s, int t) {
     int flow = 0;
     while (bfs(s, t)) {
-        memset(iter, 0, (n + 1) * sizeof(int));
-        int f;
-        while ((f = dfs(s, t, INF)) > 0) {
+        memcpy(cur, head, sizeof(head));
+        while (int f = dfs(s, t, 1e9)) {
             flow += f;
         }
     }
     return flow;
 }
 
-inline void resetFlow() {
-    int sz = edges.size();
-    for (int i = 0; i < sz; i++) {
-        edges[i].flow = 0;
+void resetCap(vector<int>& original) {
+    for (int i = 0; i < ecnt; i++) {
+        cap[i] = original[i];
     }
 }
 
@@ -87,6 +72,7 @@ int main() {
     ios_base::sync_with_stdio(false);
     cin.tie(NULL);
 
+    memset(head, -1, sizeof(head));
     cin >> n >> m;
 
     for (int i = 0; i < m; i++) {
@@ -95,11 +81,16 @@ int main() {
         addEdge(a, b, 1);
     }
 
+    vector<int> originalCap(ecnt);
+    for (int i = 0; i < ecnt; i++) {
+        originalCap[i] = cap[i];
+    }
+
     long long totalFlow = 0;
 
     for (int s = 1; s <= n; s++) {
         for (int t = s + 1; t <= n; t++) {
-            resetFlow();
+            resetCap(originalCap);
             totalFlow += maxFlow(s, t);
         }
     }
